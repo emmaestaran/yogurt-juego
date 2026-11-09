@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yogurt Catcher: Plant-Based Edition</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap');
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            touch-action: none; /* Prevents mobile scrolling while playing */
+            user-select: none;
+        }
+
+        .font-game {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        /* Glassmorphism overlays */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Animated background canvas styling */
+        #gameCanvas {
+            background: linear-gradient(180deg, #e0f2fe 0%, #fce7f3 100%);
+            border-radius: 1.5rem;
+            box-shadow: 0 15px 35px rgba(100, 116, 139, 0.2);
+        }
+
+        /* Custom button effects */
+        .btn-bounce {
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.05);
+        }
+        .btn-bounce:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden">
+
+    <!-- Main Container -->
+    <div class="relative w-full max-w-2xl flex flex-col items-center">
+
+        <!-- Top Header Stats Bar -->
+        <div class="w-full flex items-center justify-between mb-3 px-4 py-2 rounded-2xl glass-panel shadow-sm">
+            <div class="flex items-center space-x-3">
+                <div class="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">Vidas</div>
+                <div id="livesContainer" class="flex space-x-1 text-xl sm:text-2xl">
+                    <span>❤️</span><span>❤️</span><span>❤️</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="text-center">
+                    <div class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Racha</div>
+                    <div id="comboDisplay" class="text-base sm:text-lg font-game text-purple-600">x1</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Puntos</div>
+                    <div id="scoreDisplay" class="text-xl sm:text-2xl font-game text-emerald-600">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Canvas Area -->
+        <div class="relative w-full aspect-[4/5] max-h-[75vh]">
+            <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
+
+            <!-- Overlay: Start Screen -->
+            <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center glass-panel rounded-3xl z-20">
+                <div class="text-5xl sm:text-6xl mb-2 animate-bounce">🥣🌱</div>
+                <h1 class="text-3xl sm:text-5xl font-game text-pink-500 mb-2 drop-shadow-sm">Yogurt Catcher</h1>
+                <p class="text-sm sm:text-base text-slate-600 mb-4 max-w-sm">
+                    ¡Atrapa los ingredientes saludables para crear el mejor yogur vegetal! Evita las bacterias y residuos.
+                </p>
+
+                <!-- Instructions Legend -->
+                <div class="grid grid-cols-2 gap-2 text-xs text-left bg-white/70 p-3 rounded-xl mb-6 w-full max-w-xs border border-pink-100">
+                    <div><span class="text-base">🍓 🍌 🥣 🌱</span> <span class="font-bold text-emerald-600">+10 Pts</span></div>
+                    <div><span class="text-base">🦠 🥛 🪰 🗑️</span> <span class="font-bold text-rose-500">-1 Vida</span></div>
+                </div>
+
+                <button id="startBtn" class="btn-bounce bg-gradient-to-r from-pink-400 to-rose-400 hover:from-pink-500 hover:to-rose-500 text-white font-game text-xl py-3 px-8 rounded-full shadow-lg border-2 border-white">
+                    ¡JUGAR!
+                </button>
+            </div>
+
+            <!-- Overlay: Pause Screen -->
+            <div id="pauseScreen" class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 text-center glass-panel rounded-3xl z-20">
+                <h2 class="text-4xl font-game text-sky-500 mb-4">Juego Pausado</h2>
+                <button id="resumeBtn" class="btn-bounce bg-sky-400 hover:bg-sky-500 text-white font-game text-lg py-2.5 px-6 rounded-full shadow-md mb-3 border-2 border-white">
+                    Continuar
+                </button>
+                <button id="restartPauseBtn" class="btn-bounce bg-slate-200 hover:bg-slate-300 text-slate-700 font-game text-sm py-2 px-5 rounded-full">
+                    Reiniciar
+                </button>
+            </div>
+
+            <!-- Overlay: Game Over Screen -->
+            <div id="gameOverScreen" class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 text-center glass-panel rounded-3xl z-20">
+                <div class="text-5xl mb-2">😭</div>
+                <h2 class="text-3xl sm:text-4xl font-game text-rose-500 mb-1">¡Fin del Juego!</h2>
+                <p class="text-sm text-slate-500 mb-4">El yogur se ha contaminado.</p>
+
+                <div class="bg-white/80 rounded-2xl p-4 w-full max-w-xs mb-6 border border-rose-100 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400">PUNTUACIÓN FINAL</span>
+                        <span id="finalScore" class="font-game text-xl text-emerald-600">0</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t pt-2 border-slate-100">
+                        <span class="text-xs font-bold text-slate-400">RÉCORD MÁXIMO</span>
+                        <span id="highScore" class="font-game text-xl text-purple-600">0</span>
+                    </div>
+                </div>
+
+                <button id="restartBtn" class="btn-bounce bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white font-game text-xl py-3 px-8 rounded-full shadow-lg border-2 border-white">
+                    Reintentar 🔄
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls Footer -->
+        <div class="w-full flex justify-between items-center mt-3 px-2 text-xs text-slate-400">
+            <span>Controles: Flechas / A-D / Arrastrar</span>
+            <button id="pauseBtn" class="text-slate-500 hover:text-slate-800 font-bold bg-white/60 px-3 py-1 rounded-lg border border-slate-200">
+                Pausa ⏸️
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // --- Web Audio API Synth (Sound Effects) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'catch') {
+                // High happy chime
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'bad') {
+                // Low buzz/thud
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(60, now + 0.25);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'combo') {
+                // Arpeggio for combo milestone
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.08);
+                osc.frequency.setValueAtTime(659.25, now + 0.16);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.24);
+                osc.start(now);
+                osc.stop(now + 0.24);
+            }
+        }
+
+        // --- Game Setup & Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const startScreen = document.getElementById('startScreen');
+        const pauseScreen = document.getElementById('pauseScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const startBtn = document.getElementById('startBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const restartPauseBtn = document.getElementById('restartPauseBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const livesContainer = document.getElementById('livesContainer');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const highScoreDisplay = document.getElementById('highScore');
+
+        // Game State
+        let gameState = 'START'; // START, PLAYING, PAUSED, GAMEOVER
+        let score = 0;
+        let lives = 3;
+        let combo = 0;
+        let highScore = parseInt(localStorage.getItem('yogurt_high_score')) || 0;
+        let animationFrameId = null;
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 1000; // ms
+
+        // Items Configuration
+        const GOOD_ITEMS = [
+            { emoji: '🍓', name: 'Fresa' },
+            { emoji: '🍌', name: 'Plátano' },
+            { emoji: '🫐', name: 'Arándano' },
+            { emoji: '🥣', name: 'Avena' },
+            { emoji: '🍯', name: 'Miel' },
+            { emoji: '🌱', name: 'Soja' }
+        ];
+
+        const BAD_ITEMS = [
+            { emoji: '🦠', name: 'Bacteria' },
+            { emoji: '🥛', name: 'Leche Agria' },
+            { emoji: '🪰', name: 'Mosca' },
+            { emoji: '🗑️', name: 'Basura' }
+        ];
+
+        // Player (Yogurt Jar) Object
+        const player = {
+            x: 0,
+            y: 0,
+            width: 70,
+            height: 70,
+            speed: 500, // px per sec
+            targetX: 0
+        };
+
+        // Falling Items & Floating Particles Arrays
+        let items = [];
+        let particles = [];
+
+        // Keyboard State
+        const keys = { left: false, right: false };
+
+        // Resize Canvas Dynamically
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+
+            // Update player size proportionally
+            player.width = Math.max(60, canvas.width * 0.16);
+            player.height = player.width * 1.1;
+            player.y = canvas.height - player.height - 15;
+            
+            if (gameState === 'START') {
+                player.x = canvas.width / 2 - player.width / 2;
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Controls Handlers ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'p' || e.key === 'P') togglePause();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        // Pointer / Touch / Drag Control
+        let isDragging = false;
+
+        function handlePointerMove(e) {
+            if (gameState !== 'PLAYING') return;
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const touchX = clientX - rect.left;
+            player.x = touchX - player.width / 2;
+            clampPlayerPosition();
+        }
+
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; handlePointerMove(e); });
+        canvas.addEventListener('mousemove', (e) => { if (isDragging) handlePointerMove(e); });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        canvas.addEventListener('touchstart', (e) => { isDragging = true; handlePointerMove(e); }, { passive: true });
+        canvas.addEventListener('touchmove', handlePointerMove, { passive: true });
+        canvas.addEventListener('touchend', () => { isDragging = false; });
+
+        function clampPlayerPosition() {
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+        }
+
+        // --- Game Spawning Logic ---
+        function spawnItem() {
+            const isGood = Math.random() > 0.3; // 70% chance good, 30% bad
+            const list = isGood ? GOOD_ITEMS : BAD_ITEMS;
+            const template = list[Math.floor(Math.random() * list.length)];
+
+            const size = Math.max(30, canvas.width * 0.08);
+            const speed = (200 + Math.random() * 100) + (score * 4); // Speed scales with score
+
+            items.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                size: size,
+                speed: Math.min(speed, 650), // Cap max fall speed
+                emoji: template.emoji,
+                isGood: isGood,
+                rotation: 0,
+                rotSpeed: (Math.random() - 0.5) * 2
+            });
+        }
+
+        // Particle Floating Text Feedback
+        function createParticle(x, y, text, color) {
+            particles.push({
+                x: x,
+                y: y,
+                text: text,
+                color: color,
+                opacity: 1.0,
+                vy: -60 // Floating upward speed
+            });
+        }
+
+        // --- Render Functions ---
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            const w = player.width;
+            const h = player.height;
+
+            // Draw Yogurt Glass Jar Body
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+            ctx.roundRect(0, h * 0.2, w, h * 0.8, 16);
+            ctx.fill();
+            ctx.stroke();
+
+            // Glass Rim Top
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.roundRect(-w * 0.05, h * 0.1, w * 1.1, h * 0.15, 8);
+            ctx.fill();
+            ctx.stroke();
+
+            // Creamy Yogurt Fill (Inside)
+            ctx.fillStyle = '#fce7f3'; // Soft pastel pink/white yogurt
+            ctx.beginPath();
+            ctx.roundRect(w * 0.08, h * 0.3, w * 0.84, h * 0.65, 10);
+            ctx.fill();
+
+            // Plant-Based Emblem (Green Leaf on Jar)
+            ctx.font = `${w * 0.4}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🌱', w / 2, h * 0.62);
+
+            // Cute Kawaii Face
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.arc(w * 0.32, h * 0.45, w * 0.05, 0, Math.PI * 2); // Left Eye
+            ctx.arc(w * 0.68, h * 0.45, w * 0.05, 0, Math.PI * 2); // Right Eye
+            ctx.fill();
+
+            // Smile
+            ctx.beginPath();
+            ctx.arc(w * 0.5, h * 0.48, w * 0.08, 0, Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function drawItems() {
+            items.forEach(item => {
+                ctx.save();
+                ctx.translate(item.x + item.size / 2, item.y + item.size / 2);
+                ctx.rotate(item.rotation);
+                ctx.font = `${item.size}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(item.emoji, 0, 0);
+                ctx.restore();
+            });
+        }
+
+        function drawParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.y += p.vy * dt;
+                p.opacity -= 1.2 * dt;
+
+                if (p.opacity <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.opacity);
+                ctx.font = 'bold 20px "Fredoka One", cursive';
+                ctx.fillStyle = p.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(p.text, p.x, p.y);
+                ctx.restore();
+            }
+        }
+
+        // --- Main Game Loop ---
+        function update(dt) {
+            // Player Movement via Keyboard
+            if (keys.left) player.x -= player.speed * dt;
+            if (keys.right) player.x += player.speed * dt;
+            clampPlayerPosition();
+
+            // Item Spawning
+            spawnTimer += dt * 1000;
+            const currentInterval = Math.max(400, spawnInterval - (score * 15));
+            if (spawnTimer >= currentInterval) {
+                spawnItem();
+                spawnTimer = 0;
+            }
+
+            // Update Items
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                item.y += item.speed * dt;
+                item.rotation += item.rotSpeed * dt;
+
+                // Collision Detection with Player Jar
+                const hitX = item.x + item.size * 0.8 > player.x && item.x + item.size * 0.2 < player.x + player.width;
+                const hitY = item.y + item.size > player.y + player.height * 0.2 && item.y < player.y + player.height;
+
+                if (hitX && hitY) {
+                    if (item.isGood) {
+                        combo++;
+                        const comboBonus = combo > 3 ? 2 : 1;
+                        const pts = 10 * comboBonus;
+                        score += pts;
+                        
+                        playSound(combo > 3 ? 'combo' : 'catch');
+                        createParticle(item.x, item.y, `+${pts} ${combo > 3 ? '🔥' : ''}`, '#10b981');
+                    } else {
+                        combo = 0;
+                        lives--;
+                        playSound('bad');
+                        createParticle(item.x, item.y, '-1 ❤️', '#f43f5e');
+                        updateLivesUI();
+
+                        if (lives <= 0) {
+                            endGame();
+                            return;
+                        }
+                    }
+
+                    updateUI();
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                // Remove items that fell past bottom
+                if (item.y > canvas.height + 50) {
+                    if (item.isGood) {
+                        // Reset combo if a good item is missed
+                        combo = 0;
+                        updateUI();
+                    }
+                    items.splice(i, 1);
+                }
+            }
+        }
+
+        function render(dt) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawPlayer();
+            drawItems();
+            drawParticles(dt);
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState !== 'PLAYING') return;
+
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // Cap delta time to prevent large jumps when switching tabs
+            if (dt < 0.1) {
+                update(dt);
+                render(dt);
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- UI Updates ---
+        function updateUI() {
+            scoreDisplay.textContent = score;
+            comboDisplay.textContent = `x${Math.max(1, combo)}`;
+            if (combo > 3) {
+                comboDisplay.classList.add('animate-bounce');
+            } else {
+                comboDisplay.classList.remove('animate-bounce');
+            }
+        }
+
+        function updateLivesUI() {
+            livesContainer.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('span');
+                heart.textContent = i < lives ? '❤️' : '🖤';
+                livesContainer.appendChild(heart);
+            }
+        }
+
+        // --- State Controllers ---
+        function startGame() {
+            initAudio();
+            resizeCanvas();
+            score = 0;
+            lives = 3;
+            combo = 0;
+            items = [];
+            particles = [];
+            spawnTimer = 0;
+            lastTime = 0;
+
+            updateUI();
+            updateLivesUI();
+
+            startScreen.classList.add('hidden');
+            pauseScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+
+            gameState = 'PLAYING';
+            requestAnimationFrame(gameLoop);
+        }
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                pauseScreen.classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                pauseScreen.classList.add('hidden');
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('yogurt_high_score', highScore);
+            }
+
+            finalScoreDisplay.textContent = score;
+            highScoreDisplay.textContent = highScore;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        // Event Listeners for UI Buttons
+        startBtn.addEventListener('click', startGame);
+        resumeBtn.addEventListener('click', togglePause);
+        pauseBtn.addEventListener('click', togglePause);
+        restartBtn.addEventListener('click', startGame);
+        restartPauseBtn.addEventListener('click', startGame);
+
+        // Initial render on load
+        window.onload = () => {
+            resizeCanvas();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+        };
+    </script>
+</body>
+</html>
